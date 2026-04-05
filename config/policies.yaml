@@ -1,0 +1,37 @@
+tiers:
+  high_priority:
+    requests_per_minute: 1000
+    burst_capacity: 1000
+
+  medium_priority:
+    requests_per_minute: 100
+    burst_capacity: 100
+
+  low_priority:
+    requests_per_minute: 10
+    burst_capacity: 10
+
+clients:
+  client_a: high_priority
+  client_b: high_priority
+  client_c: high_priority
+
+  client_d: medium_priority
+  client_e: medium_priority
+  client_f: medium_priority
+  client_g: medium_priority
+  client_h: medium_priority
+  client_i: medium_priority
+
+  client_j: low_priority
+  client_k: low_priority
+  client_l: low_priority
+  client_m: low_priority
+  client_n: low_priority
+  client_o: low_priority
+  client_p: low_priority
+  client_q: low_priority
+  client_r: low_priority
+  client_s: low_priority
+  client_t: low_priority
+  client_u: low_priority
