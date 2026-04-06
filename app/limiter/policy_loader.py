@@ -1,5 +1,5 @@
+import asyncio
 from pathlib import Path
-from typing import Dict, Optional
 import yaml
 
 from app.models.policy import TierConfiguration, ResolvedPolicy
@@ -13,25 +13,25 @@ class PolicyLoader:
     def __init__(self, config_path: str) -> None:
         self.config_path = Path(config_path)
         # Maps Tier name to its configuration
-        self._tiers: Dict[str, TierConfiguration] = {}
+        self._tiers: dict[str, TierConfiguration] = {}
         # Maps Client ID to Tier name
-        self._clients: Dict[str, str] = {}
-        self.load()
+        self._clients: dict[str, str] = {}
 
-    def load(self) -> None:
-        """Reads the YAML config file and validates the structure and tier assignments."""
-
+    async def load(self) -> None:
         # Check if the config file exists
         if not self.config_path.exists():
             raise PolicyConfigError(f"Policy file not found: {self.config_path}")
 
-        try:
-            # Open and parse the YAML file into a dictionary
-            with self.config_path.open("r", encoding="utf-8") as file:
-                raw_config = yaml.safe_load(file) or {}  # Handle empty file case
-        except yaml.YAMLError as exc:
-            # Catch and handle YAML parsing errors
-            raise PolicyConfigError(f"Invalid YAML in policy file: {exc}") from exc
+        def _read_and_parse() -> dict:
+            try:
+                # Open and parse the YAML file into a dictionary
+                with self.config_path.open("r", encoding="utf-8") as file:
+                    return yaml.safe_load(file) or {}  # Handle empty file case
+            except yaml.YAMLError as exc:
+                # Catch and handle YAML parsing errors
+                raise PolicyConfigError(f"Invalid YAML in policy file: {exc}") from exc
+
+        raw_config = await asyncio.to_thread(_read_and_parse)
 
         # Extract tiers and clients from the raw config
         tiers = raw_config.get("tiers")
@@ -45,7 +45,7 @@ class PolicyLoader:
         if not isinstance(clients, dict) or not clients:
             raise PolicyConfigError("`clients` must be a non-empty mapping")
 
-        parsed_tiers: Dict[str, TierConfiguration] = {}
+        parsed_tiers: dict[str, TierConfiguration] = {}
 
         # Iterate over each tier and config pair and validate
         for tier_name, tier_data in tiers.items():
@@ -71,7 +71,7 @@ class PolicyLoader:
         self._tiers = parsed_tiers
         self._clients = clients
 
-    def get_policy_for_client(self, client_id: str) -> Optional[ResolvedPolicy]:
+    def get_policy_for_client(self, client_id: str) -> ResolvedPolicy | None:
         """Returns the resolved policy for a given client ID, with correct Tier configuration."""
         # Extract the tier name for the given client ID
         tier_name = self._clients.get(client_id)

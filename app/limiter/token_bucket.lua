@@ -50,7 +50,7 @@ end
 
 -- Update the bucket state in Redis
 redis.call(
-    'HMSET',
+    'HSET',
     key,
     'tokens_remaining', tokens,
     'last_refill_timestamp', last_refill_timestamp
