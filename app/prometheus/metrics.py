@@ -1,4 +1,19 @@
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Histogram, Gauge
+
+LIMITR_DOWN = Gauge(
+    "limitr_down",
+    "Indicates whether Limitr is currently down (1) or up (0)",
+)
+
+LIMITR_OUTAGE_SECONDS_TOTAL = Counter(
+    "limitr_outage_seconds_total",
+    "Total number of seconds Limitr has been down",
+)
+
+REQUESTS_DURING_OUTAGE_TOTAL = Counter(
+    "limitr_requests_during_outage_total",
+    "Total number of requests received while Limitr is down",
+)
 
 REQUESTS_TOTAL = Counter(
     "limitr_requests_total",
@@ -18,9 +33,4 @@ REQUESTS_REJECTED_TOTAL = Counter(
 REDIS_LATENCY_SECONDS = Histogram(
     "limitr_redis_latency_seconds",
     "Latency of Redis rate-limit checks",
-)
-
-FAIL_OPEN_TOTAL = Counter(
-    "limitr_fail_open_total",
-    "Total number of fail-open events when Redis is unavailable",
 )
