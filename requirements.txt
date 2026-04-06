@@ -1,5 +1,10 @@
 fastapi[standard]
 pydantic
+pydantic-settings
 redis
+pyyaml
+httpx
 pytest
+pytest-asyncio
+locust
 prometheus-client
