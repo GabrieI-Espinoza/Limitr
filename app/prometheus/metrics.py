@@ -1,6 +1,4 @@
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
-from starlette.responses import Response
-
+from prometheus_client import Counter, Histogram
 
 REQUESTS_TOTAL = Counter(
     "limitr_requests_total",
