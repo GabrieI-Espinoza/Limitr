@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
         await shutdown_dependencies(app)
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
 app.add_middleware(RateLimitMiddleware)
 app.include_router(router)

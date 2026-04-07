@@ -1,79 +1,110 @@
+import logging
+
+import httpx
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse, StreamingResponse
 
 from app.core.settings import settings
 from app.prometheus.metrics import (
     REQUESTS_TOTAL,
     REQUESTS_ALLOWED_TOTAL,
     REQUESTS_REJECTED_TOTAL,
+    REQUESTS_DURING_OUTAGE_TOTAL,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Middleware that intercepts all incoming requests and applies rate limiting."""
+    """Middleware that intercepts incoming requests, enforces rate limits,
+    and proxies allowed requests to the protected backend service."""
 
-    async def dispatch(self, request: Request, call_next) -> Response:
-        # Exclude all the following paths from rate limiting
-        if request.url.path in settings.excluded_paths:
+    async def dispatch(self, request: Request, call_next):
+        # Limitr's own operational endpoints bypass rate limiting and proxying
+        path = request.url.path
+        if any(path == p or path.startswith(p + "/") for p in settings.excluded_paths):
             return await call_next(request)
 
         if settings.prometheus_enabled:
-            # Increment total requests counter
             REQUESTS_TOTAL.inc()
 
-        # Extract client_id from the specified header
+        # Extract client identity from request headers
         client_id = request.headers.get(settings.client_id_header)
 
-        # If client did not provide the required header, return a 400 Bad Request response
         if not client_id:
             return JSONResponse(
                 status_code=400,
-                content={
-                    "detail": f"Missing required header: {settings.client_id_header}"
-                },
+                content={"detail": "Bad request."},
             )
 
-        # Retrive the policy loader and rate limiter services from the application state
         policy_loader = request.app.state.policy_loader
         rate_limiter = request.app.state.rate_limiter
 
-        # Extract the rate limit policy for the given client_id
         policy = policy_loader.get_policy_for_client(client_id)
 
-        # If policy is not found for the client_id, return a 403 Forbidden response
         if policy is None:
             return JSONResponse(
                 status_code=403,
-                content={"detail": f"Unknown client_id: {client_id}"},
+                content={"detail": "Forbidden."},
             )
 
-        # Wait for token bucket algorithm to check if the request is allowed under the current policy
         decision = await rate_limiter.check_rate_limit(policy)
 
-        # If client has exceeded the rate limit, return a 429 Too Many Requests
+        if decision.fail_close:
+            if settings.prometheus_enabled:
+                REQUESTS_REJECTED_TOTAL.inc()
+                REQUESTS_DURING_OUTAGE_TOTAL.inc()
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "Service unavailable."},
+            )
+
         if not decision.allowed:
             if settings.prometheus_enabled:
-                # Increment rejected requests counter
                 REQUESTS_REJECTED_TOTAL.inc()
             return JSONResponse(
                 status_code=429,
-                content={"detail": "Rate limit exceeded"},
-                headers={
-                    "Retry-After": str(int(decision.retry_after_seconds or 0)),
-                    "X-RateLimit-Limit": str(decision.bucket_capacity),
-                    "X-RateLimit-Remaining": str(decision.tokens_remaining),
-                },
+                content={"detail": "Rate limit exceeded."},
             )
 
         if settings.prometheus_enabled:
-            # Increment allowed requests counter
             REQUESTS_ALLOWED_TOTAL.inc()
 
-        response = await call_next(request)
+        # Forward the allowed request to the protected backend service
+        return await self._proxy_request(request)
 
-        # Add bucket capacity and remaining tokens to the response
-        response.headers["X-RateLimit-Limit"] = str(decision.bucket_capacity)
-        response.headers["X-RateLimit-Remaining"] = str(decision.tokens_remaining)
+    async def _proxy_request(
+        self, request: Request
+    ) -> StreamingResponse | JSONResponse:
+        """Forward the request to the backend and stream the response back."""
+        http_client: httpx.AsyncClient = request.app.state.http_client
 
-        return response
+        # Extract the request body to forward it to the backend
+        body = await request.body()
+
+        try:
+            # Build the backend request by copying needed components from the original request
+            backend_response = await http_client.request(
+                method=request.method,  # Extract and copy the HTTP method
+                url=str(request.url.path),  # Extract and copy the endpoint
+                headers={
+                    key: value
+                    for key, value in request.headers.items()
+                    if key.lower() != "host"
+                },
+                params=dict(request.query_params),  # Copy query parameters
+                content=body,  # Copy the request body
+            )
+        except httpx.ConnectError as e:
+            logger.error("Backend unreachable: %s", e)
+            return JSONResponse(
+                status_code=502,
+                content={"detail": "Service unavailable."},
+            )
+        # Copy backend response and send back to the client
+        return StreamingResponse(
+            content=iter([backend_response.content]),
+            status_code=backend_response.status_code,
+            headers=dict(backend_response.headers),
+        )
