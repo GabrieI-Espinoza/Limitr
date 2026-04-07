@@ -11,3 +11,48 @@ services:
       timeout: 3s
       retries: 5
     restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: limitr-backend
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  limitr-1:
+    build: .
+    container_name: limitr-1
+    environment:
+      - LIMITR_REDIS_URL=redis://redis:6379/0
+      - LIMITR_BACKEND_URL=http://backend:8080
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
+  limitr-2:
+    build: .
+    container_name: limitr-2
+    environment:
+      - LIMITR_REDIS_URL=redis://redis:6379/0
+      - LIMITR_BACKEND_URL=http://backend:8080
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: limitr-lb
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - limitr-1
+      - limitr-2
+    restart: unless-stopped
