@@ -11,16 +11,16 @@ def valid_policy_file(tmp_path):
     policy_file.write_text(
         """
 tiers:
-  high_priority:
-    requests_per_minute: 1000
-    burst_capacity: 1000
-  low_priority:
-    requests_per_minute: 10
-    burst_capacity: 10
+  enterprise:
+    requests_per_minute: 120
+    burst_capacity: 20
+  free:
+    requests_per_minute: 6
+    burst_capacity: 3
 
 clients:
-  client_a: high_priority
-  client_b: low_priority
+  client_a: enterprise
+  client_b: free
 """
     )
     return str(policy_file)
@@ -34,9 +34,9 @@ async def test_load_valid_policy(valid_policy_file):
     policy = loader.get_policy_for_client("client_a")
     assert policy is not None
     assert policy.client_id == "client_a"
-    assert policy.tier_name == "high_priority"
-    assert policy.requests_per_minute == 1000
-    assert policy.burst_capacity == 1000
+    assert policy.tier_name == "enterprise"
+    assert policy.requests_per_minute == 120
+    assert policy.burst_capacity == 20
 
 
 @pytest.mark.asyncio
@@ -46,9 +46,9 @@ async def test_tier_resolution_returns_correct_quota(valid_policy_file):
 
     policy = loader.get_policy_for_client("client_b")
     assert policy is not None
-    assert policy.tier_name == "low_priority"
-    assert policy.requests_per_minute == 10
-    assert policy.burst_capacity == 10
+    assert policy.tier_name == "free"
+    assert policy.requests_per_minute == 6
+    assert policy.burst_capacity == 3
 
 
 @pytest.mark.asyncio
@@ -80,7 +80,7 @@ async def test_invalid_yaml_syntax(tmp_path):
 @pytest.mark.asyncio
 async def test_missing_tiers_section(tmp_path):
     policy_file = tmp_path / "no_tiers.yaml"
-    policy_file.write_text("clients:\n  client_a: high_priority\n")
+    policy_file.write_text("clients:\n  client_a: enterprise\n")
 
     loader = PolicyLoader(str(policy_file))
     with pytest.raises(PolicyConfigError, match="`tiers` must be a non-empty mapping"):

@@ -32,8 +32,8 @@ async def test_unknown_client_returns_403(test_client):
 @pytest.mark.asyncio
 async def test_quota_exhaustion_returns_429(test_client):
     """After exhausting burst capacity, requests should be rejected with 429."""
-    # test_client_b is low_priority with burst_capacity=5
-    for _ in range(5):
+    # test_client_b is free tier with burst_capacity=3
+    for _ in range(3):
         response = await test_client.get(
             "/test", headers={"X-API-Key": "test_client_b"}
         )

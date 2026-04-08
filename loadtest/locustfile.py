@@ -10,65 +10,65 @@ Usage:
 from locust import HttpUser, task, between, tag
 
 
-class Tier1Client(HttpUser):
-    """High-priority client (1000 req/min)."""
+class EnterpriseClient(HttpUser):
+    """Enterprise client (120 req/min, burst 20)."""
 
-    weight = 3
-    wait_time = between(0.05, 0.1)
+    weight = 2
+    wait_time = between(0.3, 0.7)
 
-    @tag("steady", "tier1")
+    @tag("steady", "enterprise")
     @task
     def send_request(self):
         self.client.get(
             "/api/data",
             headers={"X-API-Key": "client_a"},
-            name="/api/data [tier1]",
+            name="/api/data [enterprise]",
         )
 
 
-class Tier2Client(HttpUser):
-    """Medium-priority client (100 req/min)."""
+class StandardClient(HttpUser):
+    """Standard client (30 req/min, burst 10)."""
 
-    weight = 5
-    wait_time = between(0.3, 0.6)
+    weight = 4
+    wait_time = between(1, 3)
 
-    @tag("steady", "tier2")
+    @tag("steady", "standard")
     @task
     def send_request(self):
         self.client.get(
             "/api/data",
-            headers={"X-API-Key": "client_d"},
-            name="/api/data [tier2]",
+            headers={"X-API-Key": "client_c"},
+            name="/api/data [standard]",
         )
 
 
-class Tier3Client(HttpUser):
-    """Low-priority client (10 req/min)."""
+class FreeClient(HttpUser):
+    """Free tier client (6 req/min, burst 3)."""
 
-    weight = 2
-    wait_time = between(1, 2)
+    weight = 3
+    wait_time = between(3, 6)
 
-    @tag("steady", "tier3")
+    @tag("steady", "free")
     @task
     def send_request(self):
         self.client.get(
             "/api/data",
-            headers={"X-API-Key": "client_j"},
-            name="/api/data [tier3]",
+            headers={"X-API-Key": "client_f"},
+            name="/api/data [free]",
         )
 
 
 class BurstClient(HttpUser):
-    """Simulates short bursts of traffic to test token bucket burst handling."""
+    """Simulates a client sending a rapid burst to test bucket drain."""
 
     weight = 1
-    wait_time = between(0.01, 0.02)
+    wait_time = between(0.05, 0.1)
 
     @tag("burst")
     @task
     def send_burst(self):
         self.client.get(
             "/api/data",
-            headers={"X-API-Key": "client_e"},
+            headers={"X-API-Key": "client_d"},
             name="/api/data [burst]",
         )

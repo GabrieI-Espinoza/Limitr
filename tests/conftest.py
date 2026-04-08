@@ -43,17 +43,17 @@ async def test_client(redis_client, tmp_path):
     policy_file.write_text(
         """
 tiers:
-  high_priority:
-    requests_per_minute: 1000
-    burst_capacity: 1000
-  low_priority:
-    requests_per_minute: 10
-    burst_capacity: 5
+  enterprise:
+    requests_per_minute: 120
+    burst_capacity: 20
+  free:
+    requests_per_minute: 6
+    burst_capacity: 3
 
 clients:
-  test_client_a: high_priority
-  test_client_b: low_priority
-  test_client_c: low_priority
+  test_client_a: enterprise
+  test_client_b: free
+  test_client_c: free
 """
     )
 
